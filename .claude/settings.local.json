@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(mvn clean:*)",
+      "Bash(chmod:*)",
+      "Bash(./build.sh)",
+      "Bash(java:*)",
+      "Bash(jar:*)",
+      "Bash(cat:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
