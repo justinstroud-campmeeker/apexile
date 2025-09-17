@@ -33,6 +33,10 @@ public enum TokenType {
     TRUE,
     FALSE,
     VOID,
+    INSERT,
+    UPDATE,
+    DELETE,
+    UPSERT,
     
     // Primitive types
     INTEGER,
@@ -96,12 +100,14 @@ public enum TokenType {
     INTEGER_LITERAL,
     DECIMAL_LITERAL,
     STRING_LITERAL,
+    SOQL_LITERAL,
     
     // Special
     IDENTIFIER,
     NEWLINE,
     WHITESPACE,
     COMMENT,
+    AT,                 // @
     
     // End of file
     EOF

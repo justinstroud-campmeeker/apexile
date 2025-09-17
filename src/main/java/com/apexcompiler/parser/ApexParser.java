@@ -18,6 +18,7 @@ public class ApexParser {
     }
     
     public ClassDeclaration parseClass() {
+        List<Annotation> annotations = parseAnnotations();
         List<String> modifiers = parseModifiers();
         consume(TokenType.CLASS, "Expected 'class'");
         String className = consume(TokenType.IDENTIFIER, "Expected class name").getLexeme();
@@ -40,18 +41,58 @@ public class ApexParser {
         List<VariableDeclaration> fields = new ArrayList<>();
         
         while (!check(TokenType.RIGHT_BRACE) && !isAtEnd()) {
+            List<Annotation> memberAnnotations = parseAnnotations();
             List<String> memberModifiers = parseModifiers();
             
             if (isFieldDeclaration()) {
                 fields.add(parseField(memberModifiers));
             } else {
-                methods.add(parseMethod(memberModifiers));
+                methods.add(parseMethod(memberModifiers, memberAnnotations));
             }
         }
         
         consume(TokenType.RIGHT_BRACE, "Expected '}'");
         
-        return new ClassDeclaration(className, superClass, interfaces, modifiers, methods, fields);
+        return new ClassDeclaration(className, superClass, interfaces, modifiers, methods, fields, annotations);
+    }
+    
+    private List<Annotation> parseAnnotations() {
+        List<Annotation> annotations = new ArrayList<>();
+        while (check(TokenType.AT)) {
+            advance(); // consume @
+            String name = consume(TokenType.IDENTIFIER, "Expected annotation name").getLexeme();
+            List<Annotation.AnnotationValue> values = new ArrayList<>();
+            
+            if (match(TokenType.LEFT_PAREN)) {
+                if (!check(TokenType.RIGHT_PAREN)) {
+                    do {
+                        String paramName = null;
+                        Object paramValue;
+                        
+                        if (check(TokenType.IDENTIFIER) && check(TokenType.ASSIGN, 1)) {
+                            paramName = advance().getLexeme();
+                            advance(); // consume =
+                        }
+                        
+                        if (check(TokenType.STRING_LITERAL)) {
+                            paramValue = advance().getLexeme();
+                        } else if (check(TokenType.INTEGER_LITERAL)) {
+                            paramValue = Integer.parseInt(advance().getLexeme());
+                        } else if (check(TokenType.TRUE) || check(TokenType.FALSE)) {
+                            paramValue = Boolean.parseBoolean(advance().getLexeme());
+                        } else {
+                            paramValue = advance().getLexeme();
+                        }
+                        
+                        values.add(new Annotation.AnnotationValue(paramName, paramValue));
+                    } while (match(TokenType.COMMA));
+                }
+                consume(TokenType.RIGHT_PAREN, "Expected ')'");
+            }
+            
+            annotations.add(new Annotation(name, values));
+        }
+        return annotations;
     }
     
     private List<String> parseModifiers() {
@@ -70,15 +111,59 @@ public class ApexParser {
     }
     
     private boolean isType(Token token) {
-        return token.getType() == TokenType.IDENTIFIER ||
-               token.getType() == TokenType.INTEGER ||
+        return token.getType() == TokenType.INTEGER ||
                token.getType() == TokenType.DECIMAL ||
                token.getType() == TokenType.STRING ||
                token.getType() == TokenType.BOOLEAN ||
                token.getType() == TokenType.VOID ||
                token.getType() == TokenType.LIST ||
                token.getType() == TokenType.SET ||
-               token.getType() == TokenType.MAP;
+               token.getType() == TokenType.MAP ||
+               token.getType() == TokenType.ID ||
+               token.getType() == TokenType.DATE ||
+               token.getType() == TokenType.DATETIME ||
+               token.getType() == TokenType.TIME ||
+               token.getType() == TokenType.SOBJECT ||
+               (token.getType() == TokenType.IDENTIFIER && !isKeyword(token));
+    }
+    
+    private boolean isKeyword(Token token) {
+        switch (token.getType()) {
+            case IF:
+            case ELSE:
+            case FOR:
+            case WHILE:
+            case RETURN:
+            case BREAK:
+            case CONTINUE:
+            case TRY:
+            case CATCH:
+            case FINALLY:
+            case THROW:
+            case NEW:
+            case THIS:
+            case SUPER:
+            case NULL:
+            case TRUE:
+            case FALSE:
+                return true;
+            default:
+                return false;
+        }
+    }
+    
+    private GenericType parseGenericType() {
+        String baseType = advance().getLexeme();
+        List<GenericType> typeArgs = new ArrayList<>();
+        
+        if (match(TokenType.LESS_THAN)) {
+            do {
+                typeArgs.add(parseGenericType());
+            } while (match(TokenType.COMMA));
+            consume(TokenType.GREATER_THAN, "Expected '>'");
+        }
+        
+        return new GenericType(baseType, typeArgs);
     }
     
     private boolean isFieldDeclaration() {
@@ -86,6 +171,14 @@ public class ApexParser {
         
         if (isType(peek())) {
             advance();
+            if (check(TokenType.LESS_THAN)) {
+                while (!check(TokenType.GREATER_THAN) && !isAtEnd()) {
+                    advance();
+                }
+                if (check(TokenType.GREATER_THAN)) {
+                    advance();
+                }
+            }
             if (check(TokenType.IDENTIFIER)) {
                 advance();
                 if (check(TokenType.SEMICOLON) || check(TokenType.ASSIGN)) {
@@ -100,7 +193,7 @@ public class ApexParser {
     }
     
     private VariableDeclaration parseField(List<String> modifiers) {
-        String type = advance().getLexeme();
+        GenericType type = parseGenericType();
         String name = consume(TokenType.IDENTIFIER, "Expected field name").getLexeme();
         
         Expression initializer = null;
@@ -112,7 +205,7 @@ public class ApexParser {
         return new VariableDeclaration(type, name, initializer, modifiers);
     }
     
-    private MethodDeclaration parseMethod(List<String> modifiers) {
+    private MethodDeclaration parseMethod(List<String> modifiers, List<Annotation> annotations) {
         String returnType = "void";
         String methodName;
         
@@ -138,7 +231,7 @@ public class ApexParser {
         
         BlockStatement body = parseBlockStatement();
         
-        return new MethodDeclaration(methodName, returnType, parameters, modifiers, body);
+        return new MethodDeclaration(methodName, returnType, parameters, modifiers, body, annotations);
     }
     
     private BlockStatement parseBlockStatement() {
@@ -159,6 +252,7 @@ public class ApexParser {
         if (match(TokenType.FOR)) return parseForStatement();
         if (match(TokenType.RETURN)) return parseReturnStatement();
         if (match(TokenType.LEFT_BRACE)) return parseBlockStatement();
+        if (match(TokenType.INSERT, TokenType.UPDATE, TokenType.DELETE, TokenType.UPSERT)) return parseDmlStatement();
         
         if (isType(peek()) && check(TokenType.IDENTIFIER, 1)) {
             return parseVariableDeclaration();
@@ -167,16 +261,23 @@ public class ApexParser {
         return parseExpressionStatement();
     }
     
+    private Statement parseDmlStatement() {
+        TokenType operation = previous().getType();
+        Expression target = parseExpression();
+        consume(TokenType.SEMICOLON, "Expected ';'");
+        return new DmlStatement(operation, target);
+    }
+    
     private Statement parseIfStatement() {
         consume(TokenType.LEFT_PAREN, "Expected '('");
         Expression condition = parseExpression();
         consume(TokenType.RIGHT_PAREN, "Expected ')'");
         
-        Statement thenBranch = parseStatement();
+        Statement thenBranch = parseBlockStatement();
         Statement elseBranch = null;
         
         if (match(TokenType.ELSE)) {
-            elseBranch = parseStatement();
+            elseBranch = parseBlockStatement();
         }
         
         return new IfStatement(condition, thenBranch, elseBranch);
@@ -399,6 +500,10 @@ public class ApexParser {
         
         if (match(TokenType.STRING_LITERAL)) {
             return new LiteralExpression(previous().getLexeme(), "String");
+        }
+        
+        if (match(TokenType.SOQL_LITERAL)) {
+            return new SoqlExpression(previous().getLexeme());
         }
         
         if (match(TokenType.IDENTIFIER)) {

@@ -56,6 +56,10 @@ public class ApexLexer {
         keywords.put("List", TokenType.LIST);
         keywords.put("Set", TokenType.SET);
         keywords.put("Map", TokenType.MAP);
+        keywords.put("insert", TokenType.INSERT);
+        keywords.put("update", TokenType.UPDATE);
+        keywords.put("delete", TokenType.DELETE);
+        keywords.put("upsert", TokenType.UPSERT);
     }
     
     public ApexLexer(String source) {
@@ -97,7 +101,11 @@ public class ApexLexer {
                 addToken(TokenType.RIGHT_BRACE);
                 break;
             case '[':
-                addToken(TokenType.LEFT_BRACKET);
+                if (isSoqlQuery()) {
+                    soqlQuery();
+                } else {
+                    addToken(TokenType.LEFT_BRACKET);
+                }
                 break;
             case ']':
                 addToken(TokenType.RIGHT_BRACKET);
@@ -116,6 +124,9 @@ public class ApexLexer {
                 break;
             case ':':
                 addToken(TokenType.COLON);
+                break;
+            case '@':
+                addToken(TokenType.AT);
                 break;
             case '+':
                 if (match('+')) {
@@ -308,6 +319,45 @@ public class ApexLexer {
     private void addToken(TokenType type, String literal) {
         String text = source.substring(start, current);
         tokens.add(new Token(type, literal != null ? literal : text, line, column - text.length()));
+    }
+    
+    private boolean isSoqlQuery() {
+        int saved = current;
+        advance(); // consume [
+        
+        while (!isAtEnd() && peek() != ']') {
+            if (peek() == '\n') {
+                line++;
+                column = 0;
+            }
+            advance();
+        }
+        
+        boolean isSoql = !isAtEnd();
+        current = saved;
+        return isSoql;
+    }
+    
+    private void soqlQuery() {
+        advance(); // consume [
+        StringBuilder query = new StringBuilder();
+        
+        while (peek() != ']' && !isAtEnd()) {
+            if (peek() == '\n') {
+                line++;
+                column = 0;
+            }
+            query.append(advance());
+        }
+        
+        if (isAtEnd()) {
+            throw new RuntimeException("Unterminated SOQL query at line " + line);
+        }
+        
+        advance(); // consume ]
+        
+        String soqlQuery = query.toString().trim();
+        addToken(TokenType.SOQL_LITERAL, soqlQuery);
     }
     
     private boolean isAtEnd() {

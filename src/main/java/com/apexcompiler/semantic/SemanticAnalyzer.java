@@ -19,6 +19,7 @@ public class SemanticAnalyzer implements ASTVisitor<String> {
     }
     
     private void initializeBuiltinTypes() {
+        // Primitive types
         currentScope.define(new Symbol("Integer", "Type", SymbolKind.CLASS));
         currentScope.define(new Symbol("Decimal", "Type", SymbolKind.CLASS));
         currentScope.define(new Symbol("String", "Type", SymbolKind.CLASS));
@@ -27,10 +28,50 @@ public class SemanticAnalyzer implements ASTVisitor<String> {
         currentScope.define(new Symbol("DateTime", "Type", SymbolKind.CLASS));
         currentScope.define(new Symbol("Time", "Type", SymbolKind.CLASS));
         currentScope.define(new Symbol("Id", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("Blob", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("Object", "Type", SymbolKind.CLASS));
+        
+        // Collection types
         currentScope.define(new Symbol("List", "Type", SymbolKind.CLASS));
         currentScope.define(new Symbol("Set", "Type", SymbolKind.CLASS));
         currentScope.define(new Symbol("Map", "Type", SymbolKind.CLASS));
+        
+        // SObject and standard objects
         currentScope.define(new Symbol("SObject", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("Account", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("Contact", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("Lead", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("Opportunity", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("Case", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("User", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("Profile", "Type", SymbolKind.CLASS));
+        
+        // System classes
+        currentScope.define(new Symbol("System", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("Database", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("Test", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("Schema", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("Trigger", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("Limits", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("Math", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("Json", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("Http", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("HttpRequest", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("HttpResponse", "Type", SymbolKind.CLASS));
+        
+        // Exception types
+        currentScope.define(new Symbol("Exception", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("DmlException", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("QueryException", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("NullPointerException", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("ListException", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("StringException", "Type", SymbolKind.CLASS));
+        
+        // Apex-specific types
+        currentScope.define(new Symbol("PageReference", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("ApexPages", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("Messaging", "Type", SymbolKind.CLASS));
+        currentScope.define(new Symbol("SelectOption", "Type", SymbolKind.CLASS));
     }
     
     public List<String> analyze(ClassDeclaration classDecl) {
@@ -116,21 +157,21 @@ public class SemanticAnalyzer implements ASTVisitor<String> {
         if (currentScope.isDefined(node.getName())) {
             errors.add("Variable '" + node.getName() + "' is already defined");
         } else {
-            currentScope.define(new Symbol(node.getName(), node.getType(), SymbolKind.VARIABLE));
+            currentScope.define(new Symbol(node.getName(), node.getType().toString(), SymbolKind.VARIABLE));
         }
         
-        if (currentScope.lookup(node.getType()) == null) {
-            errors.add("Type '" + node.getType() + "' not found");
+        if (currentScope.lookup(node.getType().getBaseType()) == null) {
+            errors.add("Type '" + node.getType().getBaseType() + "' not found");
         }
         
         if (node.getInitializer() != null) {
             String initType = node.getInitializer().accept(this);
-            if (initType != null && !isAssignableFrom(node.getType(), initType)) {
+            if (initType != null && !isAssignableFrom(node.getType().toString(), initType)) {
                 errors.add("Cannot assign " + initType + " to " + node.getType());
             }
         }
         
-        return node.getType();
+        return node.getType().toString();
     }
     
     @Override
@@ -355,5 +396,21 @@ public class SemanticAnalyzer implements ASTVisitor<String> {
         }
         
         return false;
+    }
+    
+    @Override
+    public String visitAnnotation(Annotation node) {
+        return null;
+    }
+    
+    @Override
+    public String visitSoqlExpression(SoqlExpression node) {
+        return "List<SObject>";
+    }
+    
+    @Override
+    public String visitDmlStatement(DmlStatement node) {
+        node.getTarget().accept(this);
+        return null;
     }
 }

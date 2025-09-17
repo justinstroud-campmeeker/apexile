@@ -10,6 +10,7 @@ src/main/java/com/apexcompiler/ast/MethodDeclaration.java
 src/main/java/com/apexcompiler/ast/IfStatement.java
 src/main/java/com/apexcompiler/ast/Statement.java
 src/main/java/com/apexcompiler/ast/ASTNode.java
+src/main/java/com/apexcompiler/ast/SoqlExpression.java
 src/main/java/com/apexcompiler/ast/VariableDeclaration.java
 src/main/java/com/apexcompiler/ast/MemberExpression.java
 src/main/java/com/apexcompiler/ast/WhileStatement.java
@@ -24,5 +25,8 @@ src/main/java/com/apexcompiler/ast/CallExpression.java
 src/main/java/com/apexcompiler/ast/BlockStatement.java
 src/main/java/com/apexcompiler/ast/ReturnStatement.java
 src/main/java/com/apexcompiler/ast/ClassDeclaration.java
+src/main/java/com/apexcompiler/ast/DmlStatement.java
+src/main/java/com/apexcompiler/ast/GenericType.java
 src/main/java/com/apexcompiler/ast/BinaryExpression.java
+src/main/java/com/apexcompiler/ast/Annotation.java
 src/main/java/com/apexcompiler/ast/ForStatement.java

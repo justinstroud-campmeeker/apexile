@@ -121,7 +121,7 @@ public class JavaCodeGenerator implements ASTVisitor<String> {
             output.append(modifier).append(" ");
         }
         
-        output.append(apexToJavaType(node.getType())).append(" ");
+        output.append(node.getType().toJavaType()).append(" ");
         output.append(node.getName());
         
         if (node.getInitializer() != null) {
@@ -360,6 +360,64 @@ public class JavaCodeGenerator implements ASTVisitor<String> {
         }
         
         node.getValue().accept(this);
+        return null;
+    }
+    
+    @Override
+    public String visitAnnotation(Annotation node) {
+        output.append("@").append(node.getName());
+        if (!node.getValues().isEmpty()) {
+            output.append("(");
+            StringJoiner valueJoiner = new StringJoiner(", ");
+            for (Annotation.AnnotationValue value : node.getValues()) {
+                if (value.getName() != null) {
+                    valueJoiner.add(value.getName() + " = " + formatAnnotationValue(value.getValue()));
+                } else {
+                    valueJoiner.add(formatAnnotationValue(value.getValue()));
+                }
+            }
+            output.append(valueJoiner.toString());
+            output.append(")");
+        }
+        return null;
+    }
+    
+    private String formatAnnotationValue(Object value) {
+        if (value instanceof String) {
+            return "\"" + value + "\"";
+        } else {
+            return value.toString();
+        }
+    }
+    
+    @Override
+    public String visitSoqlExpression(SoqlExpression node) {
+        output.append("MockDataService.executeSoql(\"");
+        output.append(node.getQuery().replace("\"", "\\\""));
+        output.append("\")");
+        return null;
+    }
+    
+    @Override
+    public String visitDmlStatement(DmlStatement node) {
+        indent();
+        switch (node.getOperation()) {
+            case INSERT:
+                output.append("MockDataService.insertRecords(");
+                break;
+            case UPDATE:
+                output.append("MockDataService.updateRecords(");
+                break;
+            case DELETE:
+                output.append("MockDataService.deleteRecords(");
+                break;
+            case UPSERT:
+                output.append("MockDataService.upsertRecords(");
+                break;
+        }
+        node.getTarget().accept(this);
+        output.append(");");
+        newLine();
         return null;
     }
 }

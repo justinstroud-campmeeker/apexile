@@ -17,4 +17,7 @@ public interface ASTVisitor<T> {
     T visitLiteralExpression(LiteralExpression node);
     T visitIdentifierExpression(IdentifierExpression node);
     T visitAssignmentExpression(AssignmentExpression node);
+    T visitAnnotation(Annotation node);
+    T visitSoqlExpression(SoqlExpression node);
+    T visitDmlStatement(DmlStatement node);
 }
